@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Displaywall VJ-Manager</title>
+  <link rel="stylesheet" href="/static/style.css?v=10">
+</head>
+<body>
+
+<!-- Transport-Toolbar (oben, PocketVJ-Style) -->
+<div class="toolbar" id="toolbar">
+  <button class="tb-btn tb-prev" onclick="cmdAll('prev')" title="Vorheriges Asset">
+    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="3" width="3" height="18"/><polygon points="20,3 8,12 20,21"/></svg>
+  </button>
+  <button class="tb-btn tb-play" onclick="cmdAll('play')" title="Alle abspielen">
+    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+  </button>
+  <button class="tb-btn tb-stop" onclick="cmdAll('stop')" title="Alle stoppen / Einfrieren">
+    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+  </button>
+  <button class="tb-btn tb-next" onclick="cmdAll('next')" title="Naechstes Asset">
+    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="4,3 16,12 4,21"/><rect x="17" y="3" width="3" height="18"/></svg>
+  </button>
+  <div class="tb-info">
+    <span class="tb-dot" id="tbDot1"></span> V1
+    <span class="tb-dot" id="tbDot2"></span> V2
+    <span id="tbTemp"></span>
+  </div>
+</div>
+
+<!-- Hauptbereich: Links Content, Rechts Pool (immer sichtbar) -->
+<div class="main-layout">
+
+  <!-- Linke Seite: Tab-Inhalte -->
+  <div class="content-area" id="contentArea">
+
+    <!-- Tab: Canvas + Playlist (kombiniert) -->
+    <div class="tab-content active" id="tabCanvas" data-color="#f29c33">
+      <div class="tab-header">
+        <h1>Monitor-Anordnung</h1>
+        <span class="tab-subtitle">Monitore verschieben — Klick waehlt Monitor fuer Playlist</span>
+      </div>
+      <div class="canvas-toolbar">
+        <button class="canvas-mode-btn active" id="btnModeSelect" onclick="setCanvasMode('select')">Auswaehlen</button>
+        <button class="canvas-mode-btn" id="btnModeArrange" onclick="setCanvasMode('arrange')">Anordnen</button>
+        <span class="canvas-mode-hint" id="canvasModeHint">Klick = Monitor fuer Playlist waehlen</span>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="wallCanvas" width="700" height="320"></canvas>
+      </div>
+
+      <!-- Playlist + Preview nebeneinander -->
+      <div class="playlist-preview-layout">
+
+      <!-- Live-Preview des aktuellen Assets -->
+      <div class="live-preview" id="livePreview">
+        <div class="live-preview-header">
+          <span class="live-preview-label">Aktuell</span>
+          <span class="live-preview-name" id="livePreviewName">—</span>
+        </div>
+        <div class="live-preview-content" id="livePreviewContent">
+          <div class="live-preview-placeholder">Monitor waehlen</div>
+        </div>
+      </div>
+
+      <!-- Playlist -->
+      <div class="inline-playlist" id="inlinePlaylist">
+        <div class="inline-playlist-header">
+          <h2 id="playlistTitle">Monitor waehlen</h2>
+          <span class="save-indicator" id="saveIndicator"></span>
+          <div class="monitor-selector" id="monitorSelector"></div>
+        </div>
+        <div class="playlist-actions">
+          <button class="pl-action-btn" id="shuffleBtn" onclick="toggleShuffle()" title="Zufallswiedergabe: Assets werden in zufaelliger Reihenfolge abgespielt">&#x1f500; Zufall</button>
+        </div>
+        <p class="playlist-info">Playlist wird in <code>wall_config.json</code> auf dem Pi gespeichert. Aenderungen sind sofort aktiv.</p>
+        <ul class="playlist-items" id="playlistItems">
+          <li class="empty-hint">Klick auf einen Monitor im Canvas oder waehle oben</li>
+        </ul>
+        <div class="playlist-drop-zone" id="playlistDropZone">
+          Assets aus dem Pool hierher ziehen
+        </div>
+      </div>
+      </div><!-- /playlist-preview-layout -->
+    </div>
+
+    <!-- Tab: Pool (Asset-Browser) -->
+    <div class="tab-content" id="tabPool" data-color="#4296d2">
+      <div class="tab-header">
+        <h1>Asset-Pool</h1>
+        <span class="tab-subtitle">Alle Dateien auf dem Head — farbig nach Display-Zuordnung</span>
+      </div>
+      <div class="pool-tab-actions">
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Dateien hochladen</button>
+        <span class="pool-tab-count" id="poolTabCount">0 Assets</span>
+      </div>
+      <div class="pool-tab-grid" id="poolTabGrid"></div>
+    </div>
+
+    <!-- Tab: Devices (Display + Status kombiniert) -->
+    <div class="tab-content" id="tabDevices" data-color="#f86800">
+      <div class="tab-header">
+        <h1>Devices</h1>
+        <span class="tab-subtitle">Pis, Displays, System-Status — je 2 Displays pro Pi</span>
+      </div>
+      <div class="status-grid" id="statusGrid"></div>
+      <h2 style="margin:1rem 0 0.5rem; font-size:0.95rem; color:#972c2b">Display-Konfiguration</h2>
+      <div class="display-grid" id="displayGrid"></div>
+    </div>
+
+
+  </div>
+
+  <!-- Rechte Seite: Pool (immer sichtbar) -->
+  <aside class="pool-sidebar" id="poolSidebar">
+    <div class="pool-header">
+      <h2>Asset-Pool</h2>
+      <span class="pool-count" id="poolCount">0 Assets</span>
+    </div>
+    <div class="pool-upload" id="poolUpload">
+      <input type="file" id="fileInput" multiple accept="image/*,video/*" style="display:none">
+      <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Dateien hochladen</button>
+      <div class="upload-drop" id="uploadDrop">oder hierher ziehen</div>
+    </div>
+    <div class="pool-list" id="poolList"></div>
+    <div class="pool-footer">
+      <a id="anthiasLink" href="#">Anthias UI</a>
+    </div>
+  </aside>
+
+</div>
+
+<!-- Output-Fenster -->
+<div class="output-bar" id="outputBar">
+  <span id="outputText">Bereit</span>
+</div>
+
+<!-- Tab-Leiste unten -->
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="tabCanvas" style="background:#f29c33">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span>Canvas</span>
+  </button>
+  <button class="tab-btn" data-tab="tabPool" style="background:#4296d2">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    <span>Pool</span>
+  </button>
+  <button class="tab-btn" data-tab="tabDevices" style="background:#f86800">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+  <span>Devices</span>
+  </button>
+  </nav>
+<script src="/static/fabric.min.js"></script>
+<script src="/static/app.js?v=16"></script>
+<script src="/static/canvas.js?v=10"></script>
+<script>
+  document.getElementById('anthiasLink').href = 'http://' + location.hostname + ':80';
+</script>
+
+</body>
+</html>
