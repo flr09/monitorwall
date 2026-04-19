@@ -228,8 +228,28 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(length)) if length else {}
 
+    # Captive-Portal: Probe-URLs der Betriebssysteme erkennen
+    _CAPTIVE_PORTAL_PATHS = {
+        "/hotspot-detect.html",        # Apple iOS/macOS
+        "/library/test/success.html",  # Apple (alternativ)
+        "/generate_204",               # Android/Chrome
+        "/gen_204",                     # Android (alternativ)
+        "/connecttest.txt",             # Windows
+        "/ncsi.txt",                    # Windows (alternativ)
+        "/redirect",                    # Windows 10+
+        "/canonical.html",             # Firefox
+        "/success.txt",                # Firefox (alternativ)
+    }
+
     def do_GET(self):
         path = urlparse(self.path).path
+
+        # Captive-Portal-Erkennung: Probe-URLs der Betriebssysteme
+        if path.lower() in self._CAPTIVE_PORTAL_PATHS:
+            self.send_response(302)
+            self.send_header("Location", "http://10.0.0.1:8080/")
+            self.end_headers()
+            return
 
         if path == "/" or path == "":
             self._send_file(WEBUI_DIR / "index.html")

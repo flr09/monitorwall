@@ -138,7 +138,7 @@ EOF
 systemctl daemon-reload
 systemctl enable videowall-player.service
 
-# --- Head: zusaetzlich Manager-Service ---
+# --- Head: Manager-Service + AP ---
 if [ "$ROLE" = "head" ]; then
     info "Richte Manager-Service ein..."
     cat > /etc/systemd/system/videowall-mgr.service << EOF
@@ -161,6 +161,85 @@ EOF
 
     systemctl daemon-reload
     systemctl enable videowall-mgr.service
+
+    # --- Head: Access Point aufsetzen ---
+    info "Richte Access Point ein..."
+    if [ -f "$VIDEOWALL_SRC/setup-ap.sh" ]; then
+        # Admin-WLAN muss als Parameter uebergeben werden
+        if [ -n "${ADMIN_SSID:-}" ] && [ -n "${ADMIN_PASS:-}" ]; then
+            bash "$VIDEOWALL_SRC/setup-ap.sh" "$ADMIN_SSID" "$ADMIN_PASS"
+        else
+            warn "AP-Setup uebersprungen: ADMIN_SSID und ADMIN_PASS nicht gesetzt."
+            warn "Spaeter manuell ausfuehren: sudo bash setup-ap.sh SSID PASSWORT"
+        fi
+    fi
+
+    # --- Head: Captive Portal (Port 80 → 8080) ---
+    info "Richte Captive Portal ein..."
+    mkdir -p /etc/nftables.d
+    cat > /etc/nftables.d/captive-portal.nft << 'NFTEOF'
+table ip monitorwall-captive {
+    chain prerouting {
+        type nat hook prerouting priority dstnat;
+        iifname "wlan0" tcp dport 80 redirect to :8080
+    }
+}
+NFTEOF
+
+    cat > /etc/systemd/system/monitorwall-captive.service << 'EOF'
+[Unit]
+Description=Monitorwall Captive Portal (Port 80 → 8080)
+After=network-online.target NetworkManager.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/nftables.d/captive-portal.nft
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable monitorwall-captive.service
+    nft -f /etc/nftables.d/captive-portal.nft 2>/dev/null || true
+fi
+
+# --- Slave: WLAN "displaywall" + Head-IP konfigurieren ---
+if [ "$ROLE" = "slave" ]; then
+    info "Konfiguriere WLAN-Verbindung zum Head-AP..."
+
+    # Netplan-Config fuer displaywall-WLAN (DHCP, Head vergibt IPs)
+    cat > /etc/netplan/90-displaywall.yaml << 'NETEOF'
+network:
+  version: 2
+  wifis:
+    wlan0:
+      renderer: NetworkManager
+      match: {}
+      dhcp4: true
+      access-points:
+        "displaywall":
+          auth:
+            key-management: "psk"
+            password: "12345678"
+NETEOF
+    chmod 600 /etc/netplan/90-displaywall.yaml
+
+    # Alte WLAN-Configs deaktivieren (z.B. gaengeviertel vom Flash)
+    for f in /etc/netplan/*gaengeviertel*; do
+        if [ -f "$f" ] && [[ "$f" != *.bak ]]; then
+            mv "$f" "${f}.bak"
+            info "  Alte Config deaktiviert: $f"
+        fi
+    done
+
+    # Head-IP fuer Pull/Sync konfigurieren
+    mkdir -p "$CONFIG_DIR"
+    echo "10.0.0.1" > "$CONFIG_DIR/head.conf"
+    chown "$REAL_USER:$REAL_USER" "$CONFIG_DIR/head.conf"
+    info "Head-IP gesetzt: 10.0.0.1"
 fi
 
 # --- Zusammenfassung ---
@@ -177,10 +256,12 @@ info "Assets:     $ASSET_DIR"
 echo ""
 if [ "$ROLE" = "head" ]; then
     info "Services:   videowall-player, videowall-mgr"
-    info "Web-GUI:    http://<IP>:8080"
+    info "Web-GUI:    http://10.0.0.1:8080 oder http://displaywall"
+    info "AP:         SSID 'displaywall', PW '12345678'"
 else
     info "Services:   videowall-player"
-    info "API:        http://<IP>:8081"
+    info "Head:       10.0.0.1 (aus head.conf)"
+    info "WLAN:       verbindet sich mit 'displaywall'"
 fi
 echo ""
 warn "Neustart erforderlich: sudo reboot"
