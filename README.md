@@ -116,7 +116,7 @@ Metrik 100 = hohe Prioritaet (Internet), Metrik 200 = niedrig (kein Uplink).
 SD-Karte mit Pi-Imager flashen:
 - OS: Raspberry Pi OS (64-bit)
 - User: `head`, Passwort: `12345678`
-- WLAN: `gaengeviertel` (oder anderes Setup-WLAN mit Internet, fuer apt)
+- WLAN: `your wlan` (oder anderes Setup-WLAN mit Internet, fuer apt)
 - SSH: aktiviert
 
 ### Setup ausfuehren
@@ -126,7 +126,7 @@ cd ~/videowall
 chmod +x setup.sh
 
 # Head (TP-Link USB muss eingesteckt sein):
-sudo ADMIN_SSID="gaengeviertel" ADMIN_PASS="KommInDieGaenge!" bash setup.sh
+sudo ADMIN_SSID="Your Wlan" ADMIN_PASS="Your password" bash setup.sh
 
 # Slave:
 sudo bash setup.sh slave2
