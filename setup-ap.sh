@@ -16,8 +16,7 @@
 # Aufruf:
 #   sudo bash setup-ap.sh "ADMIN_SSID" "ADMIN_PASSWORT"
 #
-# Beispiel:
-#   sudo bash setup-ap.sh "gaengeviertel" "KommInDieGaenge!"
+#
 
 set -euo pipefail
 
